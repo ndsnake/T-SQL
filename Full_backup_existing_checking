@@ -1,0 +1,29 @@
+DECLARE @name varchar(50) --base name
+DECLARE @path varchar (256) -- backupstore folder
+DECLARE @filename varchar(256) -- filebackup name
+DECLARE @filedate varchar (20) -- backup date and time
+
+SET @path = '<backupstore>'
+SELECT @filedate = CONVERT(VARCHAR(20),GETDATE(),112) + REPLACE(CONVERT(VARCHAR(20),GETDATE(),108),':','')
+
+DECLARE db_cursor cursor for
+SELECT  d.Name
+FROM    sys.databases d
+        LEFT OUTER JOIN msdb..backupset b
+                    ON b.database_name = d.name
+                       AND b.[type] = 'D'
+WHERE b.backup_finish_date is null AND d.name <> 'tempdb'
+
+OPEN db_cursor
+FETCH NEXT FROM db_cursor INTO @name
+
+WHILE @@fetch_status = 0
+BEGIN
+	SET @filename = @path + @name + '_backup_' + @filedate + '.bak'
+	BACKUP DATABASE @name TO  DISK = @filename WITH NOFORMAT, NOINIT,  NAME = @name, SKIP, REWIND, NOUNLOAD,  STATS = 10
+	
+	FETCH NEXT FROM db_cursor INTO @name
+END
+
+CLOSE db_cursor
+DEALLOCATE db_cursor
